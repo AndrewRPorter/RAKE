@@ -11,5 +11,5 @@ Usage
 ```python
 r = Rake()
 print(r.get_phrases("Some input text..."))
-print(r.get_phrases("Some input text...", length=5))  # length of phrase list can be explicitly specified
+print(r.get_phrases("Some input text...", length=5))  # explicitly define phrase list length
 ```

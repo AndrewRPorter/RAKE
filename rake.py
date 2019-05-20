@@ -34,11 +34,7 @@ class Rake(object):
         self.phrase_length = phrase_length
 
     def _load_stop_words(self):
-        """
-        Utility function to load stop words from a file and return as a list of words
-        @param stop_word_file Path and file name of a file containing stop words.
-        @return list A list of stop words.
-        """
+        """Load stop words from StopList file"""
         with open(stop_list, "r") as f:
             lines = f.readlines()
             lines = [line.strip() for line in lines]
@@ -62,10 +58,7 @@ class Rake(object):
         return words
 
     def _split_sentences(self, text):
-        """
-        Utility function to return a list of sentences.
-        @param text The text that must be split into sentences.
-        """
+        """Utility function to return a list of sentences."""
         sentence_delimiters = re.compile(
             "[.!?,;:\t\\\\\"\\(\\)\\'\u2019\u2013]|\\s\\-\\s"
         )
@@ -73,11 +66,7 @@ class Rake(object):
         return sentences
 
     def _separate_words(self, text, min_word_return_size):
-        """
-        Utility function to return a list of all words that are have a length greater than a specified number of characters.
-        @param text The text that must be split in to words.
-        @param min_word_return_size The minimum no of characters a word must have to be included.
-        """
+        """Separates words based on length and if phrase contains numbers"""
         splitter = re.compile("[^a-zA-Z0-9_\\+\\-/]")
         words = []
         for single_word in splitter.split(text):
@@ -92,7 +81,7 @@ class Rake(object):
         return words
 
     def _calculate_word_scores(self, phraseList):
-        """"""
+        """Calculates word scores based on frequencies and degree"""
         word_frequency = {}
         word_degree = {}
 
@@ -125,7 +114,7 @@ class Rake(object):
         return str.isdigit(s)
 
     def _generate_candidate_keywords(self, sentence_list, stopword_pattern):
-        """"""
+        """Returns list of phrases that matches stopword regex"""
         phrase_list = []
         for s in sentence_list:
             tmp = re.sub(stopword_pattern, "|", s.strip())
@@ -140,7 +129,7 @@ class Rake(object):
         return phrase_list
 
     def _generate_candidate_keyword_scores(self, phrase_list, word_score):
-        """"""
+        """Calculates phrase scores"""
         keyword_candidates = {}
         for phrase in phrase_list:
 
@@ -172,11 +161,7 @@ class Rake(object):
         return keyword_candidates
 
     def get_phrases(self, text, length=None):
-        """
-        Returns a sorted list of phrases
-        @param text: input text to extra phrases from
-        @param length: specify the length of the returned phrase list
-        """
+        """Returns a sorted list of phrases"""
         sentence_list = self._split_sentences(text)
 
         phrase_list = self._generate_candidate_keywords(

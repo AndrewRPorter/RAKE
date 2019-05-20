@@ -7,6 +7,11 @@ import re
 freq_words = "word_freqs.json"
 stop_list = "StopList.txt"
 
+if not os.path.isfile(freq_words):
+    raise FileNotFoundError(f"Unable to find '{freq_words}' file in current path")
+elif not os.path.isfile(stop_list):
+    raise FileNotFoundError(f"Unable to find '{stop_list}' file in current path")
+
 
 class Rake(object):
     """Rapid automated keyword extraction implementation
@@ -14,14 +19,19 @@ class Rake(object):
     Try and store the rake object globally as it will help speed up exection times during
     initialization
 
+    Params:
+        phrase_length (int): Maximum phrase length to collect
+
     Attributes:
         stop_words_pattern (re.Pattern): pattern to match all stop words in input text
         frequent_words (dict): large english corpus with frequencies from BYU
     """
 
-    def __init__(self):
+    def __init__(self, phrase_length=2):
+        self.stop_list = self._load_stop_words()
         self.stop_words_pattern = self._build_stop_word_regex()
         self.frequent_words = self._get_frequent_english_words()
+        self.phrase_length = phrase_length
 
     def _load_stop_words(self):
         """
@@ -36,9 +46,8 @@ class Rake(object):
 
     def _build_stop_word_regex(self):
         """Creates a pattern to match stop words from the stop list"""
-        stop_word_list = self._load_stop_words()
         stop_word_regex_list = []
-        for word in stop_word_list:
+        for word in self.stop_list:
             word_regex = r"\b" + word + r"(?![\w-])"  # added look ahead for hyphen
             stop_word_regex_list.append(word_regex)
         stop_word_pattern = re.compile("|".join(stop_word_regex_list), re.IGNORECASE)
@@ -52,25 +61,13 @@ class Rake(object):
             words = json.load(f)
         return words
 
-    def _generate_candidate_keywords(self, sentence_list, stopword_pattern):
-        """"""
-        phrase_list = []
-        for s in sentence_list:
-            tmp = re.sub(stopword_pattern, "|", s.strip())
-            phrases = tmp.split("|")
-            for phrase in phrases:
-                phrase = phrase.strip().lower()
-                if phrase != "":
-                    phrase_list.append(phrase)
-        return phrase_list
-
     def _split_sentences(self, text):
         """
         Utility function to return a list of sentences.
         @param text The text that must be split into sentences.
         """
         sentence_delimiters = re.compile(
-            u"[.!?,;:\t\\\\\"\\(\\)\\'\u2019\u2013]|\\s\\-\\s"
+            "[.!?,;:\t\\\\\"\\(\\)\\'\u2019\u2013]|\\s\\-\\s"
         )
         sentences = sentence_delimiters.split(text)
         return sentences
@@ -100,7 +97,7 @@ class Rake(object):
         word_degree = {}
 
         for phrase in phraseList:
-            word_list = self._separate_words(phrase, 0)
+            word_list = self._separate_words(phrase, 2)
             word_list_length = len(word_list)
             word_list_degree = word_list_length - 1
 
@@ -122,6 +119,26 @@ class Rake(object):
 
         return word_score
 
+    def _is_number(self, s):
+        """Determins if input string is a number"""
+        s = s.replace("%", "")
+        return str.isdigit(s)
+
+    def _generate_candidate_keywords(self, sentence_list, stopword_pattern):
+        """"""
+        phrase_list = []
+        for s in sentence_list:
+            tmp = re.sub(stopword_pattern, "|", s.strip())
+            phrases = tmp.split("|")
+            for phrase in phrases:
+                phrase = phrase.strip().lower()
+                if phrase != "":
+                    phrase = re.sub(
+                        "[\"'\“\”]+[\S+\n\r\s]+", "", phrase
+                    )  # remove prepended punctuation and spaces
+                    phrase_list.append(phrase)
+        return phrase_list
+
     def _generate_candidate_keyword_scores(self, phrase_list, word_score):
         """"""
         keyword_candidates = {}
@@ -129,23 +146,30 @@ class Rake(object):
 
             phrase_words = phrase.split(" ")
 
-            if len(phrase_words) > 2:
+            if len(phrase_words) > self.phrase_length:
                 continue
             elif len([i for i in phrase_words if self._is_number(i)]) > 0:
                 continue
 
-            keyword_candidates.setdefault(phrase, 0)
             word_list = self._separate_words(phrase, 0)
+            length = len(word_list)
             candidate_score = 0
-            for word in word_list:
-                candidate_score += word_score[word]
-            keyword_candidates[phrase] = candidate_score
-        return keyword_candidates
 
-    def _is_number(self, s):
-        """Determins if input string is a number"""
-        s = s.replace("%", "")
-        return str.isdigit(s)
+            for word in word_list:
+                if word in self.frequent_words:
+                    rank = self.frequent_words[word]["rank"]
+                    idf_rank = (float(rank + 5000) ** (-0.8)) * 1000
+
+                if idf_rank:
+                    candidate_score += word_score[word] + (word_score[word] * idf_rank)
+                else:
+                    candidate_score += word_score[word]
+
+            if candidate_score > 0:
+                if length > 1:
+                    candidate_score = float(candidate_score / length)
+                keyword_candidates[phrase] = candidate_score
+        return keyword_candidates
 
     def get_phrases(self, text, length=None):
         """

@@ -1,4 +1,9 @@
 -
+—
+"
+“
+”
+'
 ,
 .
 a
@@ -222,3 +227,10 @@ thursday
 friday
 saturday
 sunday
+also
+many
+used
+use
+go
+goes
+going

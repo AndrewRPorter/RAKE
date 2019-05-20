@@ -1,4 +1,7 @@
 # Created by http://www.gitignore.io
+*word_freqs.json
+*test_documents/
+*data/
 
 ### Python ###
 # Byte-compiled / optimized / DLL files

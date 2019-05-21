@@ -5,6 +5,8 @@ This is a fork of [RAKE](https://github.com/aneesha/RAKE) with a focus on speed 
 
 This fork uses a different `StopList` and utilizes a large english word corpus to generate more accurate and useful phrase scores. The corpus can be purchased at [Word frequency data](https://www.wordfrequency.info/free.asp).
 
+A free sample of the corpus has also been provided by [wordfrequency.info](https://www.wordfrequency.info/intro.asp).
+
 Usage
 =====
 

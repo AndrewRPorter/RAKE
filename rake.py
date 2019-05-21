@@ -4,12 +4,16 @@ import operator
 import os
 import re
 
-freq_words = "word_freqs.json"
+freq_words = "word_freqs.jsonn"
+freq_words_sample = "word_freqs_sample.json"
 stop_list = "StopList.txt"
 
 if not os.path.isfile(freq_words):
-    raise FileNotFoundError(f"Unable to find '{freq_words}' file in current path")
-elif not os.path.isfile(stop_list):
+    if not os.path.isfile(freq_words_sample):
+        raise FileNotFoundError(f"Unable to find '{freq_words_sample}' file in current path")
+    else:
+        freq_words = freq_words_sample  # use sample file if large corpus is not available
+if not os.path.isfile(stop_list):
     raise FileNotFoundError(f"Unable to find '{stop_list}' file in current path")
 
 
@@ -150,7 +154,7 @@ class Rake(object):
                     idf_rank = (float(rank + 5000) ** (-0.8)) * 1000
 
                 if idf_rank:
-                    candidate_score += word_score[word] + (word_score[word] * idf_rank)
+                    candidate_score += word_score[word] - (word_score[word] * idf_rank)
                 else:
                     candidate_score += word_score[word]
 

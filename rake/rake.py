@@ -4,9 +4,12 @@ import operator
 import os
 import re
 
-freq_words = "word_freqs.jsonn"
-freq_words_sample = "word_freqs_sample.json"
-stop_list = "StopList.txt"
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+print(BASE_DIR)
+
+freq_words = os.path.join(BASE_DIR, "data/word_freqs.json")
+freq_words_sample = os.path.join(BASE_DIR, "data/word_freqs_sample.json")
+stop_list = os.path.join(BASE_DIR, "data/StopList.txt")
 
 if not os.path.isfile(freq_words):
     if not os.path.isfile(freq_words_sample):

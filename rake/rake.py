@@ -5,7 +5,6 @@ import os
 import re
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-print(BASE_DIR)
 
 freq_words = os.path.join(BASE_DIR, "data/word_freqs.json")
 freq_words_sample = os.path.join(BASE_DIR, "data/word_freqs_sample.json")

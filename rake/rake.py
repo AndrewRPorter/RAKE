@@ -39,6 +39,11 @@ class Rake(object):
         self.frequent_words = self._get_frequent_english_words()
         self.phrase_length = phrase_length
 
+    def _is_number(self, s):
+        """Determins if input string is a number"""
+        s = s.replace("%", "")
+        return str.isdigit(s)
+
     def _load_stop_words(self):
         """Load stop words from StopList file"""
         with open(stop_list, "r") as f:
@@ -86,6 +91,21 @@ class Rake(object):
                 words.append(current_word)
         return words
 
+    def _generate_candidate_keywords(self, sentence_list, stopword_pattern):
+        """Returns list of phrases that matches stopword regex"""
+        phrase_list = []
+        for s in sentence_list:
+            tmp = re.sub(stopword_pattern, "|", s.strip())
+            phrases = tmp.split("|")
+            for phrase in phrases:
+                phrase = phrase.strip().lower()
+                if phrase != "":
+                    phrase = re.sub(
+                        "[\"'\“\”]+[\S+\n\r\s]+", "", phrase
+                    )  # remove prepended punctuation and spaces
+                    phrase_list.append(phrase)
+        return phrase_list
+
     def _calculate_word_scores(self, phraseList):
         """Calculates word scores based on frequencies and degree"""
         word_frequency = {}
@@ -114,26 +134,6 @@ class Rake(object):
 
         return word_score
 
-    def _is_number(self, s):
-        """Determins if input string is a number"""
-        s = s.replace("%", "")
-        return str.isdigit(s)
-
-    def _generate_candidate_keywords(self, sentence_list, stopword_pattern):
-        """Returns list of phrases that matches stopword regex"""
-        phrase_list = []
-        for s in sentence_list:
-            tmp = re.sub(stopword_pattern, "|", s.strip())
-            phrases = tmp.split("|")
-            for phrase in phrases:
-                phrase = phrase.strip().lower()
-                if phrase != "":
-                    phrase = re.sub(
-                        "[\"'\“\”]+[\S+\n\r\s]+", "", phrase
-                    )  # remove prepended punctuation and spaces
-                    phrase_list.append(phrase)
-        return phrase_list
-
     def _generate_candidate_keyword_scores(self, phrase_list, word_score):
         """Calculates phrase scores"""
         keyword_candidates = {}
@@ -151,6 +151,7 @@ class Rake(object):
             candidate_score = 0
 
             for word in word_list:
+                idf_rank = None
                 if word in self.frequent_words:
                     rank = self.frequent_words[word]["rank"]
                     idf_rank = (float(rank + 5000) ** (-0.8)) * 1000
@@ -186,7 +187,8 @@ class Rake(object):
 
         if length:
             if length > len(sorted_keywords):
-                return sorted_keywords
-            return sorted_keywords[:10]
+                return sorted_keywords  # return all words if length is too high
+        else:
+            length = 5 + int((len(sorted_keywords) / 10))  # calculate 'suggested' length
 
-        return sorted_keywords
+        return sorted_keywords[:length]

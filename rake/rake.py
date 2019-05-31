@@ -12,9 +12,13 @@ stop_list = os.path.join(BASE_DIR, "data/StopList.txt")
 
 if not os.path.isfile(freq_words):
     if not os.path.isfile(freq_words_sample):
-        raise FileNotFoundError(f"Unable to find '{freq_words_sample}' file in current path")
+        raise FileNotFoundError(
+            f"Unable to find '{freq_words_sample}' file in current path"
+        )
     else:
-        freq_words = freq_words_sample  # use sample file if large corpus is not available
+        freq_words = (
+            freq_words_sample
+        )  # use sample file if large corpus is not available
 if not os.path.isfile(stop_list):
     raise FileNotFoundError(f"Unable to find '{stop_list}' file in current path")
 
@@ -189,6 +193,8 @@ class Rake(object):
             if length > len(sorted_keywords):
                 return sorted_keywords  # return all words if length is too high
         else:
-            length = 5 + int((len(sorted_keywords) / 10))  # calculate 'suggested' length
+            length = 5 + int(
+                (len(sorted_keywords) / 10)
+            )  # calculate 'suggested' length
 
         return sorted_keywords[:length]

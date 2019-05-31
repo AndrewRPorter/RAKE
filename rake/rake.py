@@ -31,17 +31,19 @@ class Rake(object):
 
     Params:
         phrase_length (int): Maximum phrase length to collect
+        min_word_size (int): Minimum length of word allowed to be a phrase
 
     Attributes:
         stop_words_pattern (re.Pattern): pattern to match all stop words in input text
         frequent_words (dict): large english corpus with frequencies from BYU
     """
 
-    def __init__(self, phrase_length=2):
+    def __init__(self, phrase_length=2, min_word_size=3):
         self.stop_list = self._load_stop_words()
         self.stop_words_pattern = self._build_stop_word_regex()
         self.frequent_words = self._get_frequent_english_words()
         self.phrase_length = phrase_length
+        self.min_word_size = min_word_size
 
     def _is_number(self, s):
         """Determins if input string is a number"""
@@ -80,7 +82,7 @@ class Rake(object):
         sentences = sentence_delimiters.split(text)
         return sentences
 
-    def _separate_words(self, text, min_word_return_size):
+    def _separate_words(self, text):
         """Separates words based on length and if phrase contains numbers"""
         splitter = re.compile("[^a-zA-Z0-9_\\+\\-/]")
         words = []
@@ -88,7 +90,7 @@ class Rake(object):
             current_word = single_word.strip().lower()
             # leave numbers in phrase, but don't count as words, since they tend to invalidate scores of their phrases
             if (
-                len(current_word) > min_word_return_size
+                len(current_word) > self.min_word_size
                 and current_word != ""
                 and not self._is_number(current_word)
             ):
@@ -110,13 +112,23 @@ class Rake(object):
                     phrase_list.append(phrase)
         return phrase_list
 
-    def _calculate_word_scores(self, phraseList):
+    def _get_idf_score(self, word):
+        """Based off of frequency in English language"""
+        if word in self.frequent_words:
+            rank = self.frequent_words[word]["rank"]
+            idf_rank = (float(rank + 5000) ** (-0.8)) * 1000
+            return idf_rank
+        else:
+            return 0
+
+    def _calculate_word_scores(self, phrase_list):
         """Calculates word scores based on frequencies and degree"""
+        phrase_list_length = len(phrase_list)
         word_frequency = {}
         word_degree = {}
 
-        for phrase in phraseList:
-            word_list = self._separate_words(phrase, 2)
+        for phrase in phrase_list:
+            word_list = self._separate_words(phrase)
             word_list_length = len(word_list)
             word_list_degree = word_list_length - 1
 
@@ -124,17 +136,19 @@ class Rake(object):
                 word_frequency.setdefault(word, 0)
                 word_frequency[word] += 1
                 word_degree.setdefault(word, 0)
-
-                word_degree[word] += word_list_degree  # orig.
+                word_degree[word] += word_list_degree
 
         for item in word_frequency:
             word_degree[item] = word_degree[item] + word_frequency[item]
 
-        # Calculate Word scores = deg(w)/frew(w)
         word_score = {}
-        for item in word_frequency:
-            word_score.setdefault(item, 0)
-            word_score[item] = word_degree[item] / (word_frequency[item] * 1.0)  # orig.
+        for word, freq in word_frequency.items():
+            frequency = 100 * float(freq / phrase_list_length)
+            idf = self._get_idf_score(word)
+            score = frequency - (frequency * idf)  # reduce score for frequent words by IDF value
+
+            word_score.setdefault(word, 0)
+            word_score[word] = score
 
         return word_score
 
@@ -142,32 +156,26 @@ class Rake(object):
         """Calculates phrase scores"""
         keyword_candidates = {}
         for phrase in phrase_list:
+            phrase_words = self._separate_words(phrase)
+            length = len(phrase.split(" "))  # length of separation of phrase by spaces
 
-            phrase_words = phrase.split(" ")
-
-            if len(phrase_words) > self.phrase_length:
+            if not phrase_words:
+                continue
+            elif length > self.phrase_length:
                 continue
             elif len([i for i in phrase_words if self._is_number(i)]) > 0:
-                continue
+                continue 
 
-            word_list = self._separate_words(phrase, 0)
-            length = len(word_list)
             candidate_score = 0
 
-            for word in word_list:
-                idf_rank = None
-                if word in self.frequent_words:
-                    rank = self.frequent_words[word]["rank"]
-                    idf_rank = (float(rank + 5000) ** (-0.8)) * 1000
+            for word in phrase_words:
+                candidate_score += word_score[word]
 
-                if idf_rank:
-                    candidate_score += word_score[word] - (word_score[word] * idf_rank)
-                else:
-                    candidate_score += word_score[word]
+            #print(phrase_words, length)
 
             if candidate_score > 0:
                 if length > 1:
-                    candidate_score = float(candidate_score / length)
+                    candidate_score = float(candidate_score / (length * 1.05))
                 keyword_candidates[phrase] = candidate_score
         return keyword_candidates
 

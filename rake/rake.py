@@ -171,8 +171,6 @@ class Rake(object):
             for word in phrase_words:
                 candidate_score += word_score[word]
 
-            #print(phrase_words, length)
-
             if candidate_score > 0:
                 if length > 1:
                     candidate_score = float(candidate_score / (length * 1.05))

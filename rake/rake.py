@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 import json
 import operator
+import math
 import os
 import re
 
@@ -44,6 +45,7 @@ class Rake(object):
         self.frequent_words = self._get_frequent_english_words()
         self.phrase_length = phrase_length
         self.min_word_size = min_word_size
+        self.tf_scores = {}
 
     def _is_number(self, s):
         """Determins if input string is a number"""
@@ -65,6 +67,32 @@ class Rake(object):
             stop_word_regex_list.append(word_regex)
         stop_word_pattern = re.compile("|".join(stop_word_regex_list), re.IGNORECASE)
         return stop_word_pattern
+
+    def _get_tf_scores(self, text, words):
+        """Calculates the term frequency of every word
+
+        Note:
+            tf = (# times term appears in document) / (Total # terms)
+        """
+        tf_dict = {}
+        length = len(words)
+
+        for word in words:
+            tf_dict[word] = (
+                sum(1 for _ in re.finditer(r"\b%s\b" % re.escape(word), text)) / length
+            )
+            tf_dict[word] = 1 if tf_dict[word] == 0 else tf_dict[word]
+
+        return tf_dict
+
+    def _get_idf_score(self, word):
+        """Based off of frequency in English language"""
+        if word in self.frequent_words:
+            rank = self.frequent_words[word]["rank"]
+            idf_rank = (float(rank + 5000) ** (-0.8)) * 1000
+            return idf_rank
+        else:
+            return 0
 
     def _get_frequent_english_words(self):
         """Returns a dictionary of frequent english words from BYU corpus"""
@@ -112,14 +140,15 @@ class Rake(object):
                     phrase_list.append(phrase)
         return phrase_list
 
-    def _get_idf_score(self, word):
-        """Based off of frequency in English language"""
-        if word in self.frequent_words:
-            rank = self.frequent_words[word]["rank"]
-            idf_rank = (float(rank + 5000) ** (-0.8)) * 1000
-            return idf_rank
-        else:
-            return 0
+    def _get_phrase_occurances(self, word, phrase_list):
+        """Calculates occurances of word in multi-word noun-phrases"""
+        total = 0
+
+        for phrase in [phrase for phrase in phrase_list if phrase != word]:
+            count = sum(1 for _ in re.finditer(r"\b%s\b" % re.escape(word), phrase))
+            total += count
+
+        return total
 
     def _calculate_word_scores(self, phrase_list):
         """Calculates word scores based on frequencies and degree"""
@@ -145,7 +174,15 @@ class Rake(object):
         for word, freq in word_frequency.items():
             frequency = 100 * float(freq / phrase_list_length)
             idf = self._get_idf_score(word)
-            score = frequency - (frequency * idf)  # reduce score for frequent words by IDF value
+
+            # reduce score for frequent words by IDF value
+            tf_score = self.tf_scores[word] if word in self.tf_scores else 1
+
+            phrase_occurances = self._get_phrase_occurances(word, phrase_list)
+            log_calc = math.log(phrase_occurances) if phrase_occurances != 0 else 1
+
+            # calculate logarithmicly weighted sum
+            score = (frequency - (frequency * idf))/(log_calc if log_calc else 1)
 
             word_score.setdefault(word, 0)
             word_score[word] = score
@@ -164,7 +201,7 @@ class Rake(object):
             elif length > self.phrase_length:
                 continue
             elif len([i for i in phrase_words if self._is_number(i)]) > 0:
-                continue 
+                continue
 
             candidate_score = 0
 
@@ -173,8 +210,9 @@ class Rake(object):
 
             if candidate_score > 0:
                 if length > 1:
-                    candidate_score = float(candidate_score / (length * 1.05))
+                    candidate_score = float(candidate_score / (length * 0.5))
                 keyword_candidates[phrase] = candidate_score
+
         return keyword_candidates
 
     def get_phrases(self, text, length=None):
@@ -184,6 +222,10 @@ class Rake(object):
         phrase_list = self._generate_candidate_keywords(
             sentence_list, self.stop_words_pattern
         )
+        phrase_list = [word for word in phrase_list for word in word.split("\n")]
+        phrase_list = [word for word in phrase_list if not word.endswith("-")]
+        
+        #self.tf_scores = self._get_tf_scores(text, phrase_list)
 
         word_scores = self._calculate_word_scores(phrase_list)
 

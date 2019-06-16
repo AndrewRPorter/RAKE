@@ -486,6 +486,8 @@ should
 shouldn't
 show
 side
+signiﬁcant
+signiﬁcantly
 since
 sincere
 six
@@ -581,6 +583,7 @@ truly
 try
 trying
 tue
+type
 tuesday
 tweet
 twelve

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 import json
-import operator
 import math
+import operator
 import os
 import re
 
@@ -68,32 +68,6 @@ class Rake(object):
         stop_word_pattern = re.compile("|".join(stop_word_regex_list), re.IGNORECASE)
         return stop_word_pattern
 
-    def _get_tf_scores(self, text, words):
-        """Calculates the term frequency of every word
-
-        Note:
-            tf = (# times term appears in document) / (Total # terms)
-        """
-        tf_dict = {}
-        length = len(words)
-
-        for word in words:
-            tf_dict[word] = (
-                sum(1 for _ in re.finditer(r"\b%s\b" % re.escape(word), text)) / length
-            )
-            tf_dict[word] = 1 if tf_dict[word] == 0 else tf_dict[word]
-
-        return tf_dict
-
-    def _get_idf_score(self, word):
-        """Based off of frequency in English language"""
-        if word in self.frequent_words:
-            rank = self.frequent_words[word]["rank"]
-            idf_rank = (float(rank + 5000) ** (-0.8)) * 1000
-            return idf_rank
-        else:
-            return 0
-
     def _get_frequent_english_words(self):
         """Returns a dictionary of frequent english words from BYU corpus"""
         with open(
@@ -104,9 +78,7 @@ class Rake(object):
 
     def _split_sentences(self, text):
         """Utility function to return a list of sentences."""
-        sentence_delimiters = re.compile(
-            "[.!?,;:\t\\\\\"\\(\\)\\'\u2019\u2013]|\\s\\-\\s"
-        )
+        sentence_delimiters = re.compile("[.!?,;:\t\\\\\"\\'\u2019\u2013]|\\s\\-\\s")
         sentences = sentence_delimiters.split(text)
         return sentences
 
@@ -135,7 +107,7 @@ class Rake(object):
                 phrase = phrase.strip().lower()
                 if phrase != "":
                     phrase = re.sub(
-                        "[\"'\“\”]+[\S+\n\r\s]+", "", phrase
+                        r"[\"'\“\”]+[\S+\n\r\s]+", "", phrase
                     )  # remove prepended punctuation and spaces
                     phrase_list.append(phrase)
         return phrase_list
@@ -149,6 +121,32 @@ class Rake(object):
             total += count
 
         return total
+
+    def _get_tf_scores(self, text, words):
+        """Calculates the term frequency of every word
+
+        Note:
+            tf = (# times term appears in document) / (Total # terms)
+        """
+        tf_dict = {}
+        length = len(words)
+
+        for word in words:
+            tf_dict[word] = (
+                sum(1 for _ in re.finditer(r"\b%s\b" % re.escape(word), text)) / length
+            )
+            tf_dict[word] = 1 if tf_dict[word] == 0 else tf_dict[word]
+
+        return tf_dict
+
+    def _get_idf_score(self, word):
+        """Based off of frequency in English language"""
+        if word in self.frequent_words:
+            rank = self.frequent_words[word]["rank"]
+            idf_rank = ((float(rank + 5000) ** (-0.8)) * 1000)/math.log(self.frequent_words[word]["freq"])
+            return idf_rank
+        else:
+            return 0
 
     def _calculate_word_scores(self, phrase_list):
         """Calculates word scores based on frequencies and degree"""
@@ -182,7 +180,7 @@ class Rake(object):
             log_calc = math.log(phrase_occurances) if phrase_occurances != 0 else 1
 
             # calculate logarithmicly weighted sum
-            score = (frequency - (frequency * idf))/(log_calc if log_calc else 1)
+            score = (frequency - (frequency * idf)) / (log_calc if log_calc else 1)
 
             word_score.setdefault(word, 0)
             word_score[word] = score
@@ -210,10 +208,68 @@ class Rake(object):
 
             if candidate_score > 0:
                 if length > 1:
-                    candidate_score = float(candidate_score / (length * 0.5))
+                    candidate_score = float(candidate_score / (length * 0.8))
                 keyword_candidates[phrase] = candidate_score
 
         return keyword_candidates
+
+    def get_abbreviations(self, text):
+        text = text.replace("\n", " ")
+        sentences = re.split(r"(?<!\w\.\w.)(?<![A-Z][a-z]\.)(?<=\.|\?)\s", text)
+
+        abbreviations = {}
+
+        for sentence in sentences:
+            sentence = sentence.strip()
+            search = re.search(r"\((.*?)\)", sentence)
+
+            if search:
+                words = re.findall(r"[\w*\d*\w*-]+", sentence)
+                abbreviation = search.group(1)  # get text inside parenthesis
+
+                if " " in abbreviation:  # abbreviations should not have spaces
+                    continue
+                elif not abbreviation.isupper():
+                    continue
+
+                length = len(abbreviation)
+                index = words.index(abbreviation)
+
+                split_sentence = re.split(
+                    r"[\s]", sentence
+                )  # this is needed to preserve '-' in words
+
+                # this is needed to preserve - and / characters in abbreviation
+                special_scores = " ".join(split_sentence[: index - 1]).count(
+                    "-"
+                ) + " ".join(split_sentence[: index - 1]).count("/")
+                length = length - special_scores
+
+                if (
+                    len(abbreviation) > 6
+                ):  # only include abbreviations of 'common' length
+                    continue
+                elif length > index:
+                    continue
+                elif "-" in abbreviation:
+                    abbrev_chars = abbreviation.split("-")[0]
+                    length = len(abbrev_chars)
+                elif (index - length) < 0:
+                    continue
+
+                abbreviation_words = split_sentence[index - length:index]
+                abbreviation_text = (
+                    " ".join(abbreviation_words).replace("the", "").strip()
+                )
+
+                if length > len(re.split(r"[\s-]", abbreviation_text)) + 1:
+                    continue
+
+                if abbreviation not in abbreviations:
+                    abbreviations[abbreviation] = abbreviation_text
+
+        print(abbreviations)
+        return abbreviations
 
     def get_phrases(self, text, length=None):
         """Returns a sorted list of phrases"""
@@ -224,8 +280,8 @@ class Rake(object):
         )
         phrase_list = [word for word in phrase_list for word in word.split("\n")]
         phrase_list = [word for word in phrase_list if not word.endswith("-")]
-        
-        #self.tf_scores = self._get_tf_scores(text, phrase_list)
+
+        # self.tf_scores = self._get_tf_scores(text, phrase_list)
 
         word_scores = self._calculate_word_scores(phrase_list)
 

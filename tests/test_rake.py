@@ -10,11 +10,7 @@ INVALID_ABBREVIATIONS = [
     "too short (TST)",
 ]
 
-VALID_ABBREVIATIONS = [
-    "this is a good abbreviation (TIAGA)",
-    "this-is good (TIG)",
-    "this-is good (TIG)",
-]
+VALID_ABBREVIATIONS = ["this is a good abbreviation (TIAGA)", "this-is good (TIG)"]
 
 
 @pytest.fixture

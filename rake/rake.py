@@ -143,7 +143,7 @@ class Rake(object):
         """Based off of frequency in English language"""
         if word in self.frequent_words:
             rank = self.frequent_words[word]["rank"]
-            idf_rank = ((float(rank + 5000) ** (-0.8)) * 1000)/math.log(self.frequent_words[word]["freq"])
+            idf_rank = ((float(rank) ** (-0.6)) * 1000)/math.log(self.frequent_words[word]["freq"])
             return idf_rank
         else:
             return 0
@@ -169,18 +169,11 @@ class Rake(object):
             word_degree[item] = word_degree[item] + word_frequency[item]
 
         word_score = {}
-        for word, freq in word_frequency.items():
+        for word, freq in word_degree.items():
             frequency = 100 * float(freq / phrase_list_length)
             idf = self._get_idf_score(word)
 
-            # reduce score for frequent words by IDF value
-            tf_score = self.tf_scores[word] if word in self.tf_scores else 1
-
-            phrase_occurances = self._get_phrase_occurances(word, phrase_list)
-            log_calc = math.log(phrase_occurances) if phrase_occurances != 0 else 1
-
-            # calculate logarithmicly weighted sum
-            score = (frequency - (frequency * idf)) / (log_calc if log_calc else 1)
+            score = (frequency - (frequency * idf))
 
             word_score.setdefault(word, 0)
             word_score[word] = score
@@ -198,18 +191,16 @@ class Rake(object):
                 continue
             elif length > self.phrase_length:
                 continue
-            elif len([i for i in phrase_words if self._is_number(i)]) > 0:
+            elif len([i for i in phrase_words if self._is_number(i)]) > 0:  # ignore all phrases with numbers
                 continue
 
             candidate_score = 0
 
             for word in phrase_words:
+                phrase_occurances = self._get_phrase_occurances(word, phrase_list)
                 candidate_score += word_score[word]
 
-            if candidate_score > 0:
-                if length > 1:
-                    candidate_score = float(candidate_score / (length * 0.8))
-                keyword_candidates[phrase] = candidate_score
+            keyword_candidates[phrase] = candidate_score
 
         return keyword_candidates
 
@@ -264,11 +255,12 @@ class Rake(object):
 
                 if length > len(re.split(r"[\s-]", abbreviation_text)) + 1:
                     continue
+                elif len(abbreviation) > len(abbreviation_words) + " ".join(abbreviation_words).count("-"):
+                    continue
 
                 if abbreviation not in abbreviations:
                     abbreviations[abbreviation] = abbreviation_text
 
-        print(abbreviations)
         return abbreviations
 
     def get_phrases(self, text, length=None):

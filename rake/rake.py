@@ -286,7 +286,7 @@ class Rake(object):
 
         return abbreviations
 
-    def get_phrases(self, text, length=None, abbreviations=True):
+    def get_phrases(self, text, length=None, abbreviations=False):
         """Returns a sorted list of phrases"""
         sentence_list = self._split_sentences(text)
 

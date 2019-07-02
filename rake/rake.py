@@ -143,7 +143,9 @@ class Rake(object):
         """Based off of frequency in English language"""
         if word in self.frequent_words:
             rank = self.frequent_words[word]["rank"]
-            idf_rank = ((float(rank) ** (-0.6)) * 1000)/math.log(self.frequent_words[word]["freq"])
+            idf_rank = ((float(rank) ** (-0.6)) * 1000) / math.log(
+                self.frequent_words[word]["freq"]
+            )
             return idf_rank
         else:
             return 0
@@ -173,7 +175,7 @@ class Rake(object):
             frequency = 100 * float(freq / phrase_list_length)
             idf = self._get_idf_score(word)
 
-            score = (frequency - (frequency * idf))
+            score = frequency - (frequency * idf)
 
             word_score.setdefault(word, 0)
             word_score[word] = score
@@ -191,14 +193,33 @@ class Rake(object):
                 continue
             elif length > self.phrase_length:
                 continue
-            elif len([i for i in phrase_words if self._is_number(i)]) > 0:  # ignore all phrases with numbers
+            elif (
+                len([i for i in phrase_words if self._is_number(i)]) > 0
+            ):  # ignore all phrases with numbers
                 continue
 
             candidate_score = 0
 
             for word in phrase_words:
-                phrase_occurances = self._get_phrase_occurances(word, phrase_list)
                 candidate_score += word_score[word]
+
+            keyword_candidates[phrase] = candidate_score
+
+        return keyword_candidates
+
+    def _calculate_abbreviation_scores(self, abbreviations):
+        """Calculates scores for words in abbreviations"""
+        keyword_candidates = {}
+        word_score = self._calculate_word_scores(abbreviations.values())
+
+        for abbreviation, phrase in abbreviations.items():
+            phrase_words = self._separate_words(phrase)
+            length = len(phrase.split(" "))  # length of separation of phrase by spaces
+
+            candidate_score = 0
+
+            for word in phrase_words:
+                candidate_score += word_score[word] / (3.3 * length)
 
             keyword_candidates[phrase] = candidate_score
 
@@ -248,14 +269,16 @@ class Rake(object):
                 elif (index - length) < 0:
                     continue
 
-                abbreviation_words = split_sentence[index - length:index]
+                abbreviation_words = split_sentence[index - length: index]
                 abbreviation_text = (
                     " ".join(abbreviation_words).replace("the", "").strip()
                 )
 
                 if length > len(re.split(r"[\s-]", abbreviation_text)) + 1:
                     continue
-                elif len(abbreviation) > len(abbreviation_words) + " ".join(abbreviation_words).count("-"):
+                elif len(abbreviation) > len(abbreviation_words) + " ".join(
+                    abbreviation_words
+                ).count("-"):
                     continue
 
                 if abbreviation not in abbreviations:
@@ -263,7 +286,7 @@ class Rake(object):
 
         return abbreviations
 
-    def get_phrases(self, text, length=None):
+    def get_phrases(self, text, length=None, abbreviations=True):
         """Returns a sorted list of phrases"""
         sentence_list = self._split_sentences(text)
 
@@ -273,13 +296,20 @@ class Rake(object):
         phrase_list = [word for word in phrase_list for word in word.split("\n")]
         phrase_list = [word for word in phrase_list if not word.endswith("-")]
 
-        # self.tf_scores = self._get_tf_scores(text, phrase_list)
-
         word_scores = self._calculate_word_scores(phrase_list)
 
         keyword_candidates = self._generate_candidate_keyword_scores(
             phrase_list, word_scores
         )
+
+        # calculate the associated abbreviation phrase scores
+        if abbreviations:
+            abbreviation_list = self.get_abbreviations(text)
+            abbreivation_scores = self._calculate_abbreviation_scores(abbreviation_list)
+            abbreivation_scores.update(keyword_candidates)
+            keyword_candidates = (
+                abbreivation_scores
+            )  # swithching order as to not update values in dict
 
         sorted_keywords = sorted(
             keyword_candidates.items(), key=operator.itemgetter(1), reverse=True

@@ -286,7 +286,7 @@ class Rake(object):
 
         return abbreviations
 
-    def get_phrases(self, text, length=None, abbreviations=False):
+    def get_phrases(self, text, length=None, abbreviations=False, include_scores=False):
         """Returns a sorted list of phrases"""
         sentence_list = self._split_sentences(text)
 
@@ -314,6 +314,9 @@ class Rake(object):
         sorted_keywords = sorted(
             keyword_candidates.items(), key=operator.itemgetter(1), reverse=True
         )
+
+        if not include_scores:
+            sorted_keywords = [item[0] for item in sorted_keywords]
 
         if length:
             if length > len(sorted_keywords):
